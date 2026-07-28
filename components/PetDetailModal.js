@@ -1,7 +1,7 @@
 // components/PetDetailModal.js
-// What you see when you tap a pet in the list: their profile plus their
-// medicine/supplement list. Dose reminders and dose history come later
-// (see docs/SDLC.md) — this screen is just where medicines get managed.
+// What you see when you tap a pet in the list: their profile, their
+// medicine/supplement list (with a quick "given today" toggle on each),
+// and a link into their dose history.
 
 import React from "react";
 import { Modal, View, Text, Pressable, StyleSheet, Alert, ScrollView } from "react-native";
@@ -12,12 +12,15 @@ import { COLORS } from "../theme";
 export default function PetDetailModal({
   pet,
   medicines,
+  givenTodayIds,
   hidden,
   onClose,
   onEdit,
   onDelete,
   onAddMedicine,
   onEditMedicine,
+  onToggleGiven,
+  onViewHistory,
 }) {
   if (!pet) return null;
 
@@ -30,9 +33,10 @@ export default function PetDetailModal({
 
   return (
     // Only one native Modal can safely be visible at a time — two stacked
-    // <Modal>s (this one and the medicine form) can freeze touch handling.
-    // So when the medicine form opens, `hidden` becomes true and this one
-    // steps aside without forgetting which pet it was showing.
+    // <Modal>s (this one and the medicine form or history modal) can
+    // freeze touch handling. So when either of those opens, `hidden`
+    // becomes true and this one steps aside without forgetting which pet
+    // it was showing.
     <Modal visible={!!pet && !hidden} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <ScrollView contentContainerStyle={styles.sheet} keyboardShouldPersistTaps="handled">
@@ -59,9 +63,17 @@ export default function PetDetailModal({
                 <MedicineRow
                   key={medicine.id}
                   medicine={medicine}
+                  givenToday={givenTodayIds.includes(medicine.id)}
                   onPress={() => onEditMedicine(medicine)}
+                  onToggleGiven={() => onToggleGiven(medicine)}
                 />
               ))
+            )}
+
+            {medicines.length > 0 && (
+              <Pressable onPress={onViewHistory} style={styles.historyLink}>
+                <Text style={styles.historyLinkText}>View dose history</Text>
+              </Pressable>
             )}
           </View>
 
@@ -136,6 +148,15 @@ const styles = StyleSheet.create({
     color: COLORS.inkSoft,
     fontSize: 14,
     paddingVertical: 10,
+  },
+  historyLink: {
+    marginTop: 8,
+    alignItems: "center",
+  },
+  historyLinkText: {
+    color: COLORS.moss,
+    fontSize: 13,
+    fontWeight: "600",
   },
   editButton: {
     width: "100%",

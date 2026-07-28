@@ -10,6 +10,7 @@ import { StatusBar } from "expo-status-bar";
 import { COLORS } from "./theme";
 import { loadPets, savePets } from "./lib/petStorage";
 import { loadMedicines, saveMedicines } from "./lib/medicineStorage";
+import { loadDoseLogs, saveDoseLogs, findTodayLog } from "./lib/doseLogStorage";
 import { getNextDoseDate } from "./lib/schedule";
 import { makeId } from "./lib/id";
 import { WEEK_DAYS } from "./lib/weekDays";
@@ -23,6 +24,7 @@ import PetAvatar from "./components/PetAvatar";
 import PetFormModal from "./components/PetFormModal";
 import PetDetailModal from "./components/PetDetailModal";
 import MedicineFormModal from "./components/MedicineFormModal";
+import DoseHistoryModal from "./components/DoseHistoryModal";
 
 export default function App() {
   // `pets` is the list shown on screen. `loading` is true only while we're
@@ -30,8 +32,10 @@ export default function App() {
   // empty-state message before we actually know if there are pets or not.
   const [pets, setPets] = useState([]);
   const [medicines, setMedicines] = useState([]);
+  const [doseLogs, setDoseLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPet, setSelectedPet] = useState(null);
+  const [historyVisible, setHistoryVisible] = useState(false);
 
   // The form modal is shared between "add" and "edit". When `formPet` is a
   // pet object, the form opens pre-filled to edit that pet. When it's
@@ -49,11 +53,14 @@ export default function App() {
   // useEffect with an empty [] dependency array runs once, right after the
   // very first render — the standard React way to say "load my data now."
   useEffect(() => {
-    Promise.all([loadPets(), loadMedicines()]).then(([storedPets, storedMedicines]) => {
-      setPets(storedPets);
-      setMedicines(storedMedicines);
-      setLoading(false);
-    });
+    Promise.all([loadPets(), loadMedicines(), loadDoseLogs()]).then(
+      ([storedPets, storedMedicines, storedDoseLogs]) => {
+        setPets(storedPets);
+        setMedicines(storedMedicines);
+        setDoseLogs(storedDoseLogs);
+        setLoading(false);
+      }
+    );
   }, []);
 
   // "Every N days" medicines only ever have their next few doses scheduled
@@ -93,6 +100,20 @@ export default function App() {
         .sort((a, b) => getNextDoseDate(a) - getNextDoseDate(b))
     : [];
 
+  // Which of this pet's medicines already have a dose logged today —
+  // drives the "Given today" label and the filled-in checkmark circle.
+  const givenTodayIds = petMedicines
+    .filter((m) => findTodayLog(doseLogs, m.id))
+    .map((m) => m.id);
+
+  // This pet's dose history, newest first, for the history screen.
+  const petDoseLogs = selectedPet
+    ? doseLogs
+        .filter((log) => log.petId === selectedPet.id)
+        .sort((a, b) => b.givenAt - a.givenAt)
+    : [];
+  const medicinesById = Object.fromEntries(medicines.map((m) => [m.id, m]));
+
   function openAddForm() {
     setFormPet(null);
     setFormVisible(true);
@@ -117,16 +138,20 @@ export default function App() {
 
   async function handleDeletePet(id) {
     const nextPets = pets.filter((pet) => pet.id !== id);
-    // A pet's medicines are meaningless without the pet, so they go too —
-    // otherwise they'd sit around forever as orphaned data no screen shows.
+    // A pet's medicines (and their dose history) are meaningless without
+    // the pet, so they go too — otherwise they'd sit around forever as
+    // orphaned data no screen shows.
     const medicinesToRemove = medicines.filter((m) => m.petId === id);
     const nextMedicines = medicines.filter((m) => m.petId !== id);
+    const nextDoseLogs = doseLogs.filter((log) => log.petId !== id);
     await Promise.all(medicinesToRemove.map((m) => cancelForMedicine(m)));
     setPets(nextPets);
     setMedicines(nextMedicines);
+    setDoseLogs(nextDoseLogs);
     setSelectedPet(null);
     await savePets(nextPets);
     await saveMedicines(nextMedicines);
+    await saveDoseLogs(nextDoseLogs);
   }
 
   function openAddMedicineForm() {
@@ -178,9 +203,21 @@ export default function App() {
     const medicine = medicines.find((m) => m.id === id);
     if (medicine) await cancelForMedicine(medicine);
     const next = medicines.filter((m) => m.id !== id);
+    const nextDoseLogs = doseLogs.filter((log) => log.medicineId !== id);
     setMedicines(next);
+    setDoseLogs(nextDoseLogs);
     setMedicineFormVisible(false);
     await saveMedicines(next);
+    await saveDoseLogs(nextDoseLogs);
+  }
+
+  async function handleToggleGiven(medicine) {
+    const existing = findTodayLog(doseLogs, medicine.id);
+    const next = existing
+      ? doseLogs.filter((log) => log.id !== existing.id)
+      : [...doseLogs, { id: makeId(), medicineId: medicine.id, petId: medicine.petId, givenAt: Date.now() }];
+    setDoseLogs(next);
+    await saveDoseLogs(next);
   }
 
   return (
@@ -231,12 +268,15 @@ export default function App() {
       <PetDetailModal
         pet={selectedPet}
         medicines={petMedicines}
-        hidden={medicineFormVisible}
+        givenTodayIds={givenTodayIds}
+        hidden={medicineFormVisible || historyVisible}
         onClose={() => setSelectedPet(null)}
         onEdit={openEditForm}
         onDelete={handleDeletePet}
         onAddMedicine={openAddMedicineForm}
         onEditMedicine={openEditMedicineForm}
+        onToggleGiven={handleToggleGiven}
+        onViewHistory={() => setHistoryVisible(true)}
       />
 
       <MedicineFormModal
@@ -245,6 +285,14 @@ export default function App() {
         onClose={() => setMedicineFormVisible(false)}
         onSave={handleSaveMedicine}
         onDelete={handleDeleteMedicine}
+      />
+
+      <DoseHistoryModal
+        visible={historyVisible}
+        petName={selectedPet?.name}
+        logs={petDoseLogs}
+        medicinesById={medicinesById}
+        onClose={() => setHistoryVisible(false)}
       />
     </SafeAreaView>
   );
