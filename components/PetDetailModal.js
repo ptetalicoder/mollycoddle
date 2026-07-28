@@ -8,7 +8,7 @@ import { Modal, View, Text, Pressable, StyleSheet, Alert } from "react-native";
 import PetAvatar from "./PetAvatar";
 import { COLORS } from "../theme";
 
-export default function PetDetailModal({ pet, onClose, onDelete }) {
+export default function PetDetailModal({ pet, onClose, onEdit, onDelete }) {
   if (!pet) return null;
 
   function handleDelete() {
@@ -32,6 +32,9 @@ export default function PetDetailModal({ pet, onClose, onDelete }) {
             </Text>
           </View>
 
+          <Pressable style={styles.editButton} onPress={() => onEdit(pet)}>
+            <Text style={styles.editButtonText}>Edit pet</Text>
+          </Pressable>
           <Pressable style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>Close</Text>
           </Pressable>
@@ -83,7 +86,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
   },
-  closeButton: {
+  editButton: {
     width: "100%",
     paddingVertical: 14,
     borderRadius: 10,
@@ -91,9 +94,23 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.moss,
     marginBottom: 10,
   },
-  closeButtonText: {
+  editButtonText: {
     color: "#FFFFFF",
     fontWeight: "700",
+  },
+  closeButton: {
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: "center",
+    backgroundColor: COLORS.bg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 10,
+  },
+  closeButtonText: {
+    color: COLORS.inkSoft,
+    fontWeight: "600",
   },
   deleteButton: {
     width: "100%",

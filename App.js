@@ -10,7 +10,7 @@ import { StatusBar } from "expo-status-bar";
 import { COLORS } from "./theme";
 import { loadPets, savePets, makePetId } from "./lib/petStorage";
 import PetAvatar from "./components/PetAvatar";
-import AddPetModal from "./components/AddPetModal";
+import PetFormModal from "./components/PetFormModal";
 import PetDetailModal from "./components/PetDetailModal";
 
 export default function App() {
@@ -19,8 +19,14 @@ export default function App() {
   // empty-state message before we actually know if there are pets or not.
   const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [addModalVisible, setAddModalVisible] = useState(false);
   const [selectedPet, setSelectedPet] = useState(null);
+
+  // The form modal is shared between "add" and "edit". When `formPet` is a
+  // pet object, the form opens pre-filled to edit that pet. When it's
+  // `null`, the form still opens (because `formVisible` is true) but blank,
+  // for adding a new one.
+  const [formVisible, setFormVisible] = useState(false);
+  const [formPet, setFormPet] = useState(null);
 
   // useEffect with an empty [] dependency array runs once, right after the
   // very first render — the standard React way to say "load my data now."
@@ -31,11 +37,25 @@ export default function App() {
     });
   }, []);
 
-  async function handleAddPet({ name, species, photoUri }) {
-    const newPet = { id: makePetId(), name, species, photoUri, createdAt: Date.now() };
-    const next = [...pets, newPet];
+  function openAddForm() {
+    setFormPet(null);
+    setFormVisible(true);
+  }
+
+  function openEditForm(pet) {
+    setSelectedPet(null);
+    setFormPet(pet);
+    setFormVisible(true);
+  }
+
+  async function handleSavePet({ name, species, photoUri }) {
+    // `formPet` tells us whether this save is an edit (update the matching
+    // pet in place) or an add (append a brand new one).
+    const next = formPet
+      ? pets.map((p) => (p.id === formPet.id ? { ...p, name, species, photoUri } : p))
+      : [...pets, { id: makePetId(), name, species, photoUri, createdAt: Date.now() }];
     setPets(next);
-    setAddModalVisible(false);
+    setFormVisible(false);
     await savePets(next);
   }
 
@@ -55,7 +75,7 @@ export default function App() {
           <Text style={styles.eyebrow}>MOLLYCODDLE</Text>
           <Text style={styles.title}>Your pets</Text>
         </View>
-        <Pressable style={styles.addButton} onPress={() => setAddModalVisible(true)}>
+        <Pressable style={styles.addButton} onPress={openAddForm}>
           <Text style={styles.addButtonText}>+ Add pet</Text>
         </Pressable>
       </View>
@@ -84,13 +104,19 @@ export default function App() {
         />
       )}
 
-      <AddPetModal
-        visible={addModalVisible}
-        onClose={() => setAddModalVisible(false)}
-        onSave={handleAddPet}
+      <PetFormModal
+        visible={formVisible}
+        pet={formPet}
+        onClose={() => setFormVisible(false)}
+        onSave={handleSavePet}
       />
 
-      <PetDetailModal pet={selectedPet} onClose={() => setSelectedPet(null)} onDelete={handleDeletePet} />
+      <PetDetailModal
+        pet={selectedPet}
+        onClose={() => setSelectedPet(null)}
+        onEdit={openEditForm}
+        onDelete={handleDeletePet}
+      />
     </SafeAreaView>
   );
 }

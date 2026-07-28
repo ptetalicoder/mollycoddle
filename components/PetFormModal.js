@@ -1,7 +1,8 @@
-// components/AddPetModal.js
-// The "add a pet" form. It slides up over the home screen using React
-// Native's built-in <Modal>, so we don't need a navigation library just
-// for this one screen.
+// components/PetFormModal.js
+// One form, two jobs: adding a brand new pet, or editing an existing one.
+// When `pet` is passed in, the fields start pre-filled and we're in "edit"
+// mode; when it's null, the fields start empty and we're in "add" mode.
+// Sharing one component means the two flows can never drift apart visually.
 
 import React, { useEffect, useState } from "react";
 import {
@@ -21,19 +22,22 @@ import { COLORS } from "../theme";
 
 const SPECIES_OPTIONS = ["Dog", "Cat", "Other"];
 
-export default function AddPetModal({ visible, onClose, onSave }) {
+export default function PetFormModal({ visible, pet, onClose, onSave }) {
+  const isEditing = !!pet;
+
   const [name, setName] = useState("");
   const [species, setSpecies] = useState("");
   const [photoUri, setPhotoUri] = useState(null);
 
-  // Every time the modal opens, clear out whatever was typed last time.
+  // Every time the modal opens, load either the pet being edited or a
+  // blank form — otherwise leftover text from a previous open would show.
   useEffect(() => {
     if (visible) {
-      setName("");
-      setSpecies("");
-      setPhotoUri(null);
+      setName(pet?.name ?? "");
+      setSpecies(pet?.species ?? "");
+      setPhotoUri(pet?.photoUri ?? null);
     }
-  }, [visible]);
+  }, [visible, pet]);
 
   async function handlePickPhoto() {
     // Ask permission to look at the phone's photo library. The user can
@@ -76,7 +80,7 @@ export default function AddPetModal({ visible, onClose, onSave }) {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={styles.sheet}>
-          <Text style={styles.title}>Add a pet</Text>
+          <Text style={styles.title}>{isEditing ? "Edit pet" : "Add a pet"}</Text>
 
           <Pressable style={styles.photoPicker} onPress={handlePickPhoto}>
             {photoUri ? (
@@ -93,7 +97,7 @@ export default function AddPetModal({ visible, onClose, onSave }) {
             onChangeText={setName}
             placeholder="e.g. Biscuit"
             placeholderTextColor={COLORS.inkSoft}
-            autoFocus
+            autoFocus={!isEditing}
           />
 
           <Text style={styles.label}>Species</Text>

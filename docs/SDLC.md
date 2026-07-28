@@ -22,7 +22,7 @@
 Build in small, testable increments. Rough order:
 1. ~~Hello world screen~~ ✅
 2. ~~Home screen — pet list~~ ✅
-3. Add/edit pet screen
+3. ~~Add/edit pet screen~~ ✅
 4. Add/edit medicine/supplement screen
 5. Dose scheduling logic
 6. Local notifications for reminders
