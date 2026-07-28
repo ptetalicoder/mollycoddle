@@ -4,7 +4,7 @@
 // and tapping a pet opens their profile.
 
 import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, View, SafeAreaView, FlatList, Pressable } from "react-native";
+import { StyleSheet, Text, View, SafeAreaView, FlatList, Pressable, Alert } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
 import { COLORS } from "./theme";
@@ -12,6 +12,13 @@ import { loadPets, savePets } from "./lib/petStorage";
 import { loadMedicines, saveMedicines } from "./lib/medicineStorage";
 import { getNextDoseDate } from "./lib/schedule";
 import { makeId } from "./lib/id";
+import { WEEK_DAYS } from "./lib/weekDays";
+import {
+  hasNotificationPermission,
+  requestNotificationPermission,
+  rescheduleForMedicine,
+  cancelForMedicine,
+} from "./lib/notifications";
 import PetAvatar from "./components/PetAvatar";
 import PetFormModal from "./components/PetFormModal";
 import PetDetailModal from "./components/PetDetailModal";
@@ -49,6 +56,34 @@ export default function App() {
     });
   }, []);
 
+  // "Every N days" medicines only ever have their next few doses scheduled
+  // (the OS can't repeat on a custom day count the way it can for daily or
+  // weekly). So each time the app opens, top that queue back up — but only
+  // if notifications were already allowed; we never want to trigger the
+  // permission prompt just from opening the app.
+  useEffect(() => {
+    if (loading) return;
+    const intervalMedicines = medicines.filter((m) => m.frequencyType === "interval");
+    if (intervalMedicines.length === 0) return;
+
+    hasNotificationPermission().then((granted) => {
+      if (!granted) return;
+      Promise.all(
+        intervalMedicines.map(async (medicine) => ({
+          ...medicine,
+          notificationIds: await rescheduleForMedicine(medicine, WEEK_DAYS),
+        }))
+      ).then((refreshed) => {
+        const next = medicines.map((m) => refreshed.find((r) => r.id === m.id) ?? m);
+        setMedicines(next);
+        saveMedicines(next);
+      });
+    });
+    // Only re-run when the initial load finishes, not on every edit —
+    // handleSaveMedicine already reschedules immediately after a save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
   // Only the medicines belonging to whichever pet's detail sheet is open,
   // soonest-due first — so the thing you're most likely checking on
   // (what's due today) is always at the top.
@@ -84,7 +119,9 @@ export default function App() {
     const nextPets = pets.filter((pet) => pet.id !== id);
     // A pet's medicines are meaningless without the pet, so they go too —
     // otherwise they'd sit around forever as orphaned data no screen shows.
+    const medicinesToRemove = medicines.filter((m) => m.petId === id);
     const nextMedicines = medicines.filter((m) => m.petId !== id);
+    await Promise.all(medicinesToRemove.map((m) => cancelForMedicine(m)));
     setPets(nextPets);
     setMedicines(nextMedicines);
     setSelectedPet(null);
@@ -103,15 +140,43 @@ export default function App() {
   }
 
   async function handleSaveMedicine(fields) {
+    const baseMedicine = editingMedicine
+      ? { ...editingMedicine, ...fields }
+      : { id: makeId(), petId: selectedPet.id, ...fields, createdAt: Date.now(), notificationIds: [] };
+
+    // Ask for notification permission right at the point it becomes
+    // relevant (saving a medicine that needs reminders), not at launch.
+    // If it's been asked before, this resolves instantly with no prompt.
+    let notificationIds = [];
+    try {
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        notificationIds = await rescheduleForMedicine(baseMedicine, WEEK_DAYS);
+      } else {
+        await cancelForMedicine(baseMedicine);
+      }
+    } catch (error) {
+      // Scheduling the reminder failed, but the medicine info itself is
+      // still valid — save it without a working reminder rather than
+      // silently losing the user's input.
+      Alert.alert(
+        "Couldn't schedule reminder",
+        "The medicine was saved, but its reminder notification couldn't be set up: " + error.message
+      );
+    }
+    const savedMedicine = { ...baseMedicine, notificationIds };
+
     const next = editingMedicine
-      ? medicines.map((m) => (m.id === editingMedicine.id ? { ...m, ...fields } : m))
-      : [...medicines, { id: makeId(), petId: selectedPet.id, ...fields, createdAt: Date.now() }];
+      ? medicines.map((m) => (m.id === savedMedicine.id ? savedMedicine : m))
+      : [...medicines, savedMedicine];
     setMedicines(next);
     setMedicineFormVisible(false);
     await saveMedicines(next);
   }
 
   async function handleDeleteMedicine(id) {
+    const medicine = medicines.find((m) => m.id === id);
+    if (medicine) await cancelForMedicine(medicine);
     const next = medicines.filter((m) => m.id !== id);
     setMedicines(next);
     setMedicineFormVisible(false);

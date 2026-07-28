@@ -4,9 +4,8 @@
 // `medicine` was passed in.
 //
 // Frequency is kept simple on purpose — daily, weekly (pick the days), or
-// every N days. Turning that into actual reminder times is a later step
-// (see docs/SDLC.md), this screen just needs to capture the shape of the
-// schedule.
+// every N days — paired with a reminder time of day picked from a handful
+// of presets (see lib/notifications.js), rather than an exact hour:minute.
 
 import React, { useEffect, useState } from "react";
 import {
@@ -23,6 +22,7 @@ import {
 } from "react-native";
 import { COLORS } from "../theme";
 import { WEEK_DAYS } from "../lib/weekDays";
+import { REMINDER_TIMES, requestNotificationPermission, sendTestNotification } from "../lib/notifications";
 
 const FREQUENCY_OPTIONS = [
   { key: "daily", label: "Daily" },
@@ -38,6 +38,7 @@ export default function MedicineFormModal({ visible, medicine, onClose, onSave, 
   const [frequencyType, setFrequencyType] = useState("daily");
   const [weeklyDays, setWeeklyDays] = useState([]);
   const [intervalDays, setIntervalDays] = useState("");
+  const [reminderTime, setReminderTime] = useState("morning");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export default function MedicineFormModal({ visible, medicine, onClose, onSave, 
       setFrequencyType(medicine?.frequencyType ?? "daily");
       setWeeklyDays(medicine?.weeklyDays ?? []);
       setIntervalDays(medicine?.intervalDays ? String(medicine.intervalDays) : "");
+      setReminderTime(medicine?.reminderTime ?? "morning");
       setNotes(medicine?.notes ?? "");
     }
   }, [visible, medicine]);
@@ -79,8 +81,22 @@ export default function MedicineFormModal({ visible, medicine, onClose, onSave, 
       frequencyType,
       weeklyDays: frequencyType === "weekly" ? weeklyDays : [],
       intervalDays: frequencyType === "interval" ? parsedInterval : null,
+      reminderTime,
       notes: notes.trim(),
     });
+  }
+
+  async function handleTestNotification() {
+    const granted = await requestNotificationPermission();
+    if (!granted) {
+      Alert.alert(
+        "Notifications are off",
+        "Mollycoddle can't send reminders without permission. You can enable this in your phone's Settings app."
+      );
+      return;
+    }
+    await sendTestNotification();
+    Alert.alert("Test sent", "A test notification will arrive in about 5 seconds.");
   }
 
   function handleDelete() {
@@ -170,6 +186,24 @@ export default function MedicineFormModal({ visible, medicine, onClose, onSave, 
               <Text style={styles.intervalLabel}>days</Text>
             </View>
           )}
+
+          <Text style={styles.label}>Reminder time</Text>
+          <View style={styles.chipRow}>
+            {Object.entries(REMINDER_TIMES).map(([key, option]) => (
+              <Pressable
+                key={key}
+                style={[styles.chip, reminderTime === key && styles.chipSelected]}
+                onPress={() => setReminderTime(key)}
+              >
+                <Text style={[styles.chipText, reminderTime === key && styles.chipTextSelected]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable onPress={handleTestNotification} style={styles.testLink}>
+            <Text style={styles.testLinkText}>Send a test notification</Text>
+          </Pressable>
 
           <Text style={styles.label}>Notes</Text>
           <TextInput
@@ -271,6 +305,14 @@ const styles = StyleSheet.create({
   },
   chipTextSelected: {
     color: "#FFFFFF",
+    fontWeight: "600",
+  },
+  testLink: {
+    marginBottom: 16,
+  },
+  testLinkText: {
+    color: COLORS.moss,
+    fontSize: 13,
     fontWeight: "600",
   },
   intervalRow: {
