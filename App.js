@@ -8,16 +8,20 @@ import { StyleSheet, Text, View, SafeAreaView, FlatList, Pressable } from "react
 import { StatusBar } from "expo-status-bar";
 
 import { COLORS } from "./theme";
-import { loadPets, savePets, makePetId } from "./lib/petStorage";
+import { loadPets, savePets } from "./lib/petStorage";
+import { loadMedicines, saveMedicines } from "./lib/medicineStorage";
+import { makeId } from "./lib/id";
 import PetAvatar from "./components/PetAvatar";
 import PetFormModal from "./components/PetFormModal";
 import PetDetailModal from "./components/PetDetailModal";
+import MedicineFormModal from "./components/MedicineFormModal";
 
 export default function App() {
   // `pets` is the list shown on screen. `loading` is true only while we're
   // reading from AsyncStorage for the first time, so we don't flash an
   // empty-state message before we actually know if there are pets or not.
   const [pets, setPets] = useState([]);
+  const [medicines, setMedicines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPet, setSelectedPet] = useState(null);
 
@@ -28,14 +32,24 @@ export default function App() {
   const [formVisible, setFormVisible] = useState(false);
   const [formPet, setFormPet] = useState(null);
 
+  // Same shared-form idea, but for the medicine form. This one opens on
+  // top of the pet detail sheet (rather than replacing it), so you stay in
+  // context and immediately see the updated medicine list after saving.
+  const [medicineFormVisible, setMedicineFormVisible] = useState(false);
+  const [editingMedicine, setEditingMedicine] = useState(null);
+
   // useEffect with an empty [] dependency array runs once, right after the
   // very first render — the standard React way to say "load my data now."
   useEffect(() => {
-    loadPets().then((stored) => {
-      setPets(stored);
+    Promise.all([loadPets(), loadMedicines()]).then(([storedPets, storedMedicines]) => {
+      setPets(storedPets);
+      setMedicines(storedMedicines);
       setLoading(false);
     });
   }, []);
+
+  // Only the medicines belonging to whichever pet's detail sheet is open.
+  const petMedicines = selectedPet ? medicines.filter((m) => m.petId === selectedPet.id) : [];
 
   function openAddForm() {
     setFormPet(null);
@@ -53,17 +67,48 @@ export default function App() {
     // pet in place) or an add (append a brand new one).
     const next = formPet
       ? pets.map((p) => (p.id === formPet.id ? { ...p, name, species, photoUri } : p))
-      : [...pets, { id: makePetId(), name, species, photoUri, createdAt: Date.now() }];
+      : [...pets, { id: makeId(), name, species, photoUri, createdAt: Date.now() }];
     setPets(next);
     setFormVisible(false);
     await savePets(next);
   }
 
   async function handleDeletePet(id) {
-    const next = pets.filter((pet) => pet.id !== id);
-    setPets(next);
+    const nextPets = pets.filter((pet) => pet.id !== id);
+    // A pet's medicines are meaningless without the pet, so they go too —
+    // otherwise they'd sit around forever as orphaned data no screen shows.
+    const nextMedicines = medicines.filter((m) => m.petId !== id);
+    setPets(nextPets);
+    setMedicines(nextMedicines);
     setSelectedPet(null);
-    await savePets(next);
+    await savePets(nextPets);
+    await saveMedicines(nextMedicines);
+  }
+
+  function openAddMedicineForm() {
+    setEditingMedicine(null);
+    setMedicineFormVisible(true);
+  }
+
+  function openEditMedicineForm(medicine) {
+    setEditingMedicine(medicine);
+    setMedicineFormVisible(true);
+  }
+
+  async function handleSaveMedicine(fields) {
+    const next = editingMedicine
+      ? medicines.map((m) => (m.id === editingMedicine.id ? { ...m, ...fields } : m))
+      : [...medicines, { id: makeId(), petId: selectedPet.id, ...fields, createdAt: Date.now() }];
+    setMedicines(next);
+    setMedicineFormVisible(false);
+    await saveMedicines(next);
+  }
+
+  async function handleDeleteMedicine(id) {
+    const next = medicines.filter((m) => m.id !== id);
+    setMedicines(next);
+    setMedicineFormVisible(false);
+    await saveMedicines(next);
   }
 
   return (
@@ -113,9 +158,21 @@ export default function App() {
 
       <PetDetailModal
         pet={selectedPet}
+        medicines={petMedicines}
+        hidden={medicineFormVisible}
         onClose={() => setSelectedPet(null)}
         onEdit={openEditForm}
         onDelete={handleDeletePet}
+        onAddMedicine={openAddMedicineForm}
+        onEditMedicine={openEditMedicineForm}
+      />
+
+      <MedicineFormModal
+        visible={medicineFormVisible}
+        medicine={editingMedicine}
+        onClose={() => setMedicineFormVisible(false)}
+        onSave={handleSaveMedicine}
+        onDelete={handleDeleteMedicine}
       />
     </SafeAreaView>
   );
