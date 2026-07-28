@@ -17,8 +17,10 @@ export default function MedicineRow({ medicine, givenToday, onPress, onToggleGiv
   return (
     <View style={styles.row}>
       <Pressable style={styles.info} onPress={onPress}>
-        <Text style={styles.name}>{medicine.name}</Text>
-        <Text style={styles.detail}>
+        <Text style={styles.name} numberOfLines={1}>
+          {medicine.name}
+        </Text>
+        <Text style={styles.detail} numberOfLines={1}>
           {[medicine.dosage, describeFrequency(medicine)].filter(Boolean).join(" · ")}
         </Text>
         <Text style={[styles.dueBadge, dueToday && styles.dueBadgeToday]}>{statusText}</Text>

@@ -1,10 +1,20 @@
 // App.js
 // This is the entry point of the app — the first file that runs.
-// It's now the home screen: a list of your pets, a button to add one,
-// and tapping a pet opens their profile.
+// AppContent is the actual home screen: a list of your pets, a button to
+// add one, and tapping a pet opens their profile. The default export at
+// the bottom wraps it in an ErrorBoundary before Expo renders it.
 
 import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, View, SafeAreaView, FlatList, Pressable, Alert } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  SafeAreaView,
+  FlatList,
+  Pressable,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { StatusBar } from "expo-status-bar";
 
 import { COLORS } from "./theme";
@@ -25,8 +35,9 @@ import PetFormModal from "./components/PetFormModal";
 import PetDetailModal from "./components/PetDetailModal";
 import MedicineFormModal from "./components/MedicineFormModal";
 import DoseHistoryModal from "./components/DoseHistoryModal";
+import ErrorBoundary from "./components/ErrorBoundary";
 
-export default function App() {
+function AppContent() {
   // `pets` is the list shown on screen. `loading` is true only while we're
   // reading from AsyncStorage for the first time, so we don't flash an
   // empty-state message before we actually know if there are pets or not.
@@ -234,7 +245,11 @@ export default function App() {
         </Pressable>
       </View>
 
-      {!loading && pets.length === 0 ? (
+      {loading ? (
+        <View style={styles.emptyState}>
+          <ActivityIndicator color={COLORS.moss} size="large" />
+        </View>
+      ) : pets.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>No pets yet</Text>
           <Text style={styles.emptySubtitle}>
@@ -250,8 +265,14 @@ export default function App() {
             <Pressable style={styles.petRow} onPress={() => setSelectedPet(item)}>
               <PetAvatar pet={item} size={52} />
               <View style={styles.petInfo}>
-                <Text style={styles.petName}>{item.name}</Text>
-                {!!item.species && <Text style={styles.petSpecies}>{item.species}</Text>}
+                <Text style={styles.petName} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                {!!item.species && (
+                  <Text style={styles.petSpecies} numberOfLines={1}>
+                    {item.species}
+                  </Text>
+                )}
               </View>
             </Pressable>
           )}
@@ -295,6 +316,17 @@ export default function App() {
         onClose={() => setHistoryVisible(false)}
       />
     </SafeAreaView>
+  );
+}
+
+// The actual entry point Expo renders. Wrapping AppContent in
+// ErrorBoundary means a bug anywhere below shows a recovery screen
+// instead of a blank or frozen app.
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 }
 
@@ -353,6 +385,7 @@ const styles = StyleSheet.create({
   },
   petInfo: {
     marginLeft: 14,
+    flex: 1,
   },
   petName: {
     fontSize: 17,

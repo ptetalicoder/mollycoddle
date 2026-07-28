@@ -27,7 +27,7 @@ Build in small, testable increments. Rough order:
 5. ~~Dose scheduling logic~~ ✅
 6. ~~Local notifications for reminders~~ ✅
 7. ~~Dose history view~~ ✅
-8. Polish, empty states, error handling
+8. ~~Polish, empty states, error handling~~ ✅
 
 ## 4. Testing
 - **Manual, on-device**: Expo Go during development (fastest feedback loop)
