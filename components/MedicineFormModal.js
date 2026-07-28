@@ -22,14 +22,13 @@ import {
   Platform,
 } from "react-native";
 import { COLORS } from "../theme";
+import { WEEK_DAYS } from "../lib/weekDays";
 
 const FREQUENCY_OPTIONS = [
   { key: "daily", label: "Daily" },
   { key: "weekly", label: "Weekly" },
   { key: "interval", label: "Every few days" },
 ];
-
-const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function MedicineFormModal({ visible, medicine, onClose, onSave, onDelete }) {
   const isEditing = !!medicine;

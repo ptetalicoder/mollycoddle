@@ -24,7 +24,7 @@ Build in small, testable increments. Rough order:
 2. ~~Home screen — pet list~~ ✅
 3. ~~Add/edit pet screen~~ ✅
 4. ~~Add/edit medicine/supplement screen~~ ✅
-5. Dose scheduling logic
+5. ~~Dose scheduling logic~~ ✅
 6. Local notifications for reminders
 7. Dose history view
 8. Polish, empty states, error handling

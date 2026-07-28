@@ -10,6 +10,7 @@ import { StatusBar } from "expo-status-bar";
 import { COLORS } from "./theme";
 import { loadPets, savePets } from "./lib/petStorage";
 import { loadMedicines, saveMedicines } from "./lib/medicineStorage";
+import { getNextDoseDate } from "./lib/schedule";
 import { makeId } from "./lib/id";
 import PetAvatar from "./components/PetAvatar";
 import PetFormModal from "./components/PetFormModal";
@@ -48,8 +49,14 @@ export default function App() {
     });
   }, []);
 
-  // Only the medicines belonging to whichever pet's detail sheet is open.
-  const petMedicines = selectedPet ? medicines.filter((m) => m.petId === selectedPet.id) : [];
+  // Only the medicines belonging to whichever pet's detail sheet is open,
+  // soonest-due first — so the thing you're most likely checking on
+  // (what's due today) is always at the top.
+  const petMedicines = selectedPet
+    ? medicines
+        .filter((m) => m.petId === selectedPet.id)
+        .sort((a, b) => getNextDoseDate(a) - getNextDoseDate(b))
+    : [];
 
   function openAddForm() {
     setFormPet(null);
