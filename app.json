@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Mollycoddle",
+    "slug": "mollycoddle",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#F1F4EE"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mollycoddle.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F1F4EE"
+      },
+      "package": "com.mollycoddle.app"
+    },
+    "web": {},
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Mollycoddle uses your photos to let you pick a picture of your pet."
+        }
+      ]
+    ]
+  }
+}
