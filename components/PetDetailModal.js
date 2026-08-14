@@ -1,17 +1,19 @@
 // components/PetDetailModal.js
 // What you see when you tap a pet in the list: their profile, their
 // medicine/supplement list (with a quick "given today" toggle on each),
-// and a link into their dose history.
+// their vaccination records, and a link into dose history.
 
 import React from "react";
 import { Modal, View, Text, Pressable, StyleSheet, Alert, ScrollView } from "react-native";
 import PetAvatar from "./PetAvatar";
 import MedicineRow from "./MedicineRow";
+import VaccineRow from "./VaccineRow";
 import { COLORS } from "../theme";
 
 export default function PetDetailModal({
   pet,
   medicines,
+  vaccines,
   givenTodayIds,
   hidden,
   onClose,
@@ -21,6 +23,8 @@ export default function PetDetailModal({
   onEditMedicine,
   onToggleGiven,
   onViewHistory,
+  onAddVaccine,
+  onEditVaccine,
 }) {
   if (!pet) return null;
 
@@ -46,16 +50,16 @@ export default function PetDetailModal({
             {!!pet.species && <Text style={styles.species}>{pet.species}</Text>}
           </View>
 
-          <View style={styles.medicinesSection}>
-            <View style={styles.medicinesHeader}>
-              <Text style={styles.medicinesTitle}>Medicines</Text>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Medicines</Text>
               <Pressable onPress={onAddMedicine}>
-                <Text style={styles.addMedicineText}>+ Add</Text>
+                <Text style={styles.addText}>+ Add</Text>
               </Pressable>
             </View>
 
             {medicines.length === 0 ? (
-              <Text style={styles.emptyMedicinesText}>
+              <Text style={styles.emptyText}>
                 No medicines yet. Tap "+ Add" to add {pet.name}'s first one.
               </Text>
             ) : (
@@ -74,6 +78,29 @@ export default function PetDetailModal({
               <Pressable onPress={onViewHistory} style={styles.historyLink}>
                 <Text style={styles.historyLinkText}>View dose history</Text>
               </Pressable>
+            )}
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Vaccinations</Text>
+              <Pressable onPress={onAddVaccine}>
+                <Text style={styles.addText}>+ Add</Text>
+              </Pressable>
+            </View>
+
+            {vaccines.length === 0 ? (
+              <Text style={styles.emptyText}>
+                No vaccination records yet. Tap "+ Add" to add {pet.name}'s first one.
+              </Text>
+            ) : (
+              vaccines.map((vaccine) => (
+                <VaccineRow
+                  key={vaccine.id}
+                  vaccine={vaccine}
+                  onPress={() => onEditVaccine(vaccine)}
+                />
+              ))
             )}
           </View>
 
@@ -119,32 +146,31 @@ const styles = StyleSheet.create({
     color: COLORS.inkSoft,
     marginTop: 2,
   },
-  medicinesSection: {
-    marginTop: 20,
-    marginBottom: 24,
+  section: {
+    marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 16,
     backgroundColor: COLORS.bg,
     borderRadius: 12,
     width: "100%",
   },
-  medicinesHeader: {
+  sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 4,
   },
-  medicinesTitle: {
+  sectionTitle: {
     fontSize: 15,
     fontWeight: "700",
     color: COLORS.ink,
   },
-  addMedicineText: {
+  addText: {
     fontSize: 14,
     fontWeight: "600",
     color: COLORS.moss,
   },
-  emptyMedicinesText: {
+  emptyText: {
     color: COLORS.inkSoft,
     fontSize: 14,
     paddingVertical: 10,
@@ -164,6 +190,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     backgroundColor: COLORS.moss,
+    marginTop: 24,
     marginBottom: 10,
   },
   editButtonText: {

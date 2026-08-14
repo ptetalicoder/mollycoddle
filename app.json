@@ -8,7 +8,9 @@
     "splash": {
       "backgroundColor": "#F1F4EE"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mollycoddle.app"
@@ -26,7 +28,8 @@
         {
           "photosPermission": "Mollycoddle uses your photos to let you pick a picture of your pet."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

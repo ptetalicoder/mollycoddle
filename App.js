@@ -21,6 +21,7 @@ import { COLORS } from "./theme";
 import { loadPets, savePets } from "./lib/petStorage";
 import { loadMedicines, saveMedicines } from "./lib/medicineStorage";
 import { loadDoseLogs, saveDoseLogs, findTodayLog } from "./lib/doseLogStorage";
+import { loadVaccines, saveVaccines } from "./lib/vaccineStorage";
 import { getNextDoseDate } from "./lib/schedule";
 import { makeId } from "./lib/id";
 import { WEEK_DAYS } from "./lib/weekDays";
@@ -29,11 +30,14 @@ import {
   requestNotificationPermission,
   rescheduleForMedicine,
   cancelForMedicine,
+  rescheduleForVaccine,
+  cancelForVaccine,
 } from "./lib/notifications";
 import PetAvatar from "./components/PetAvatar";
 import PetFormModal from "./components/PetFormModal";
 import PetDetailModal from "./components/PetDetailModal";
 import MedicineFormModal from "./components/MedicineFormModal";
+import VaccineFormModal from "./components/VaccineFormModal";
 import DoseHistoryModal from "./components/DoseHistoryModal";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -44,9 +48,15 @@ function AppContent() {
   const [pets, setPets] = useState([]);
   const [medicines, setMedicines] = useState([]);
   const [doseLogs, setDoseLogs] = useState([]);
+  const [vaccines, setVaccines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPet, setSelectedPet] = useState(null);
   const [historyVisible, setHistoryVisible] = useState(false);
+
+  // Same shared-form idea as the medicine form, opening on top of the pet
+  // detail sheet rather than replacing it.
+  const [vaccineFormVisible, setVaccineFormVisible] = useState(false);
+  const [editingVaccine, setEditingVaccine] = useState(null);
 
   // The form modal is shared between "add" and "edit". When `formPet` is a
   // pet object, the form opens pre-filled to edit that pet. When it's
@@ -64,11 +74,12 @@ function AppContent() {
   // useEffect with an empty [] dependency array runs once, right after the
   // very first render — the standard React way to say "load my data now."
   useEffect(() => {
-    Promise.all([loadPets(), loadMedicines(), loadDoseLogs()]).then(
-      ([storedPets, storedMedicines, storedDoseLogs]) => {
+    Promise.all([loadPets(), loadMedicines(), loadDoseLogs(), loadVaccines()]).then(
+      ([storedPets, storedMedicines, storedDoseLogs, storedVaccines]) => {
         setPets(storedPets);
         setMedicines(storedMedicines);
         setDoseLogs(storedDoseLogs);
+        setVaccines(storedVaccines);
         setLoading(false);
       }
     );
@@ -125,6 +136,15 @@ function AppContent() {
     : [];
   const medicinesById = Object.fromEntries(medicines.map((m) => [m.id, m]));
 
+  // This pet's vaccination records, most overdue/soonest-due first —
+  // ascending by due date naturally puts overdue (past) dates ahead of
+  // upcoming ones.
+  const petVaccines = selectedPet
+    ? vaccines
+        .filter((v) => v.petId === selectedPet.id)
+        .sort((a, b) => a.nextDueDate - b.nextDueDate)
+    : [];
+
   function openAddForm() {
     setFormPet(null);
     setFormVisible(true);
@@ -149,20 +169,25 @@ function AppContent() {
 
   async function handleDeletePet(id) {
     const nextPets = pets.filter((pet) => pet.id !== id);
-    // A pet's medicines (and their dose history) are meaningless without
-    // the pet, so they go too — otherwise they'd sit around forever as
-    // orphaned data no screen shows.
+    // A pet's medicines, dose history, and vaccination records are
+    // meaningless without the pet, so they go too — otherwise they'd sit
+    // around forever as orphaned data no screen shows.
     const medicinesToRemove = medicines.filter((m) => m.petId === id);
     const nextMedicines = medicines.filter((m) => m.petId !== id);
     const nextDoseLogs = doseLogs.filter((log) => log.petId !== id);
+    const vaccinesToRemove = vaccines.filter((v) => v.petId === id);
+    const nextVaccines = vaccines.filter((v) => v.petId !== id);
     await Promise.all(medicinesToRemove.map((m) => cancelForMedicine(m)));
+    await Promise.all(vaccinesToRemove.map((v) => cancelForVaccine(v)));
     setPets(nextPets);
     setMedicines(nextMedicines);
     setDoseLogs(nextDoseLogs);
+    setVaccines(nextVaccines);
     setSelectedPet(null);
     await savePets(nextPets);
     await saveMedicines(nextMedicines);
     await saveDoseLogs(nextDoseLogs);
+    await saveVaccines(nextVaccines);
   }
 
   function openAddMedicineForm() {
@@ -231,6 +256,54 @@ function AppContent() {
     await saveDoseLogs(next);
   }
 
+  function openAddVaccineForm() {
+    setEditingVaccine(null);
+    setVaccineFormVisible(true);
+  }
+
+  function openEditVaccineForm(vaccine) {
+    setEditingVaccine(vaccine);
+    setVaccineFormVisible(true);
+  }
+
+  async function handleSaveVaccine(fields) {
+    const baseVaccine = editingVaccine
+      ? { ...editingVaccine, ...fields }
+      : { id: makeId(), petId: selectedPet.id, ...fields, createdAt: Date.now(), notificationId: null };
+
+    let notificationId = null;
+    try {
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        notificationId = await rescheduleForVaccine(baseVaccine);
+      } else {
+        await cancelForVaccine(baseVaccine);
+      }
+    } catch (error) {
+      Alert.alert(
+        "Couldn't schedule reminder",
+        "The vaccination record was saved, but its reminder couldn't be set up: " + error.message
+      );
+    }
+    const savedVaccine = { ...baseVaccine, notificationId };
+
+    const next = editingVaccine
+      ? vaccines.map((v) => (v.id === savedVaccine.id ? savedVaccine : v))
+      : [...vaccines, savedVaccine];
+    setVaccines(next);
+    setVaccineFormVisible(false);
+    await saveVaccines(next);
+  }
+
+  async function handleDeleteVaccine(id) {
+    const vaccine = vaccines.find((v) => v.id === id);
+    if (vaccine) await cancelForVaccine(vaccine);
+    const next = vaccines.filter((v) => v.id !== id);
+    setVaccines(next);
+    setVaccineFormVisible(false);
+    await saveVaccines(next);
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
@@ -289,8 +362,9 @@ function AppContent() {
       <PetDetailModal
         pet={selectedPet}
         medicines={petMedicines}
+        vaccines={petVaccines}
         givenTodayIds={givenTodayIds}
-        hidden={medicineFormVisible || historyVisible}
+        hidden={medicineFormVisible || historyVisible || vaccineFormVisible}
         onClose={() => setSelectedPet(null)}
         onEdit={openEditForm}
         onDelete={handleDeletePet}
@@ -298,6 +372,8 @@ function AppContent() {
         onEditMedicine={openEditMedicineForm}
         onToggleGiven={handleToggleGiven}
         onViewHistory={() => setHistoryVisible(true)}
+        onAddVaccine={openAddVaccineForm}
+        onEditVaccine={openEditVaccineForm}
       />
 
       <MedicineFormModal
@@ -306,6 +382,14 @@ function AppContent() {
         onClose={() => setMedicineFormVisible(false)}
         onSave={handleSaveMedicine}
         onDelete={handleDeleteMedicine}
+      />
+
+      <VaccineFormModal
+        visible={vaccineFormVisible}
+        vaccine={editingVaccine}
+        onClose={() => setVaccineFormVisible(false)}
+        onSave={handleSaveVaccine}
+        onDelete={handleDeleteVaccine}
       />
 
       <DoseHistoryModal
