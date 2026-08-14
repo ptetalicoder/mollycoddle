@@ -50,8 +50,10 @@ Your phone and computer need to be on the **same Wi-Fi network** for this to wor
 
 The "import from photo/PDF" feature (for both medicines and vaccines) calls a small backend that talks to Claude. To enable it locally:
 
-1. Copy `lib/config.example.js` to `lib/config.js` (already gitignored — this file holds a real secret, never commit it).
-2. Fill in `VACCINE_BACKEND_URL` and `APP_SHARED_SECRET` — ask whoever deployed the backend (see [Backend](#backend--ai-import) below) for these values.
+1. Copy `.env.example` to `.env` (already gitignored — this file holds a real secret, never commit it).
+2. Fill in `EXPO_PUBLIC_VACCINE_BACKEND_URL` and `EXPO_PUBLIC_APP_SHARED_SECRET` — ask whoever deployed the backend (see [Backend](#backend--ai-import) below) for these values.
+
+For cloud builds (`eas build`), these also need to be set as EAS environment variables (`npx eas-cli env:create`) for whichever environment the build profile uses — a local `.env` file only covers `npx expo start` and `eas update` publishes, which bundle on your own machine.
 
 Without this file, the rest of the app works fine — you just won't be able to use the photo/PDF import buttons.
 
@@ -80,9 +82,7 @@ mollycoddle/
 │   ├── documentExtraction.js   ← calls the AI backend to read a photo/PDF
 │   ├── notifications.js        ← schedules local reminder notifications
 │   ├── weekDays.js             ← weekday name constants
-│   ├── id.js                   ← generates local IDs for new records
-│   ├── config.example.js       ← template for the AI backend URL/secret (committed)
-│   └── config.js               ← your real values (gitignored, not committed)
+│   └── id.js                   ← generates local IDs for new records
 └── components/                 ← reusable screen pieces
     ├── PetAvatar.js            ← a pet's photo, or a colored circle with their initial
     ├── PetFormModal.js         ← add/edit a pet
