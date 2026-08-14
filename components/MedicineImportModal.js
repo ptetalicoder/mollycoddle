@@ -1,20 +1,20 @@
-// components/VaccineImportModal.js
-// Bulk import: take a photo of a vaccination sheet (or attach a PDF), let
-// Claude read every vaccine it can find in one pass, then review the whole
-// list at once — uncheck anything wrong or unwanted, and add the rest in a
-// single tap. This replaces having to re-attach the same document over and
-// over to pull vaccines out one at a time.
+// components/MedicineImportModal.js
+// Bulk import: take a photo of a prescription label, vet discharge
+// summary, or supplement bottle (or attach a PDF), let Claude read every
+// medicine it can find in one pass, then review the whole list at once —
+// uncheck anything wrong or unwanted, and add the rest in a single tap.
+// Same pattern as VaccineImportModal.js.
 //
-// If a found vaccine's name matches one you already have on file for this
-// pet, it defaults to *updating* that record's dates (the common case: you
-// photograph an updated card after a booster) instead of creating a
-// duplicate — tap the note under a matched row to switch it to "add as new"
-// if the match is wrong.
+// If a found medicine's name matches one you already have on file for
+// this pet, it defaults to *updating* that record's dosage/frequency (the
+// common case: you photograph a renewed prescription with a changed dose)
+// instead of creating a duplicate — tap the note under a matched row to
+// switch it to "add as new" if the match is wrong.
 //
-// This screen only picks *which* extracted vaccines to keep and whether
-// each updates or adds — it doesn't let you edit individual fields. If a
-// date needs fixing after import, open that vaccine from the list and edit
-// it normally.
+// The app's medicine model only supports one reminder per day — there's
+// no "twice daily" concept, for extracted medicines any more than for ones
+// you type in yourself. Claude sets those to a daily reminder and puts the
+// exact wording (e.g. "twice daily", "give with food") in notes instead.
 
 import React, { useEffect, useState } from "react";
 import {
@@ -31,19 +31,15 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { COLORS } from "../theme";
 import { extractFromFile, parseLocalDate } from "../lib/documentExtraction";
-import { formatDate as formatKnownDate } from "../lib/vaccineSchedule";
+import { describeFrequency } from "../lib/medicineStorage";
+import { formatDate } from "../lib/vaccineSchedule";
 
-function formatDate(timestamp) {
-  return timestamp === null ? "No date found" : formatKnownDate(timestamp);
-}
-
-function findExistingMatch(name, existingVaccines) {
+function findExistingMatch(name, existingMedicines) {
   const normalized = name.trim().toLowerCase();
-  return existingVaccines.find((v) => v.name.trim().toLowerCase() === normalized) ?? null;
+  return existingMedicines.find((m) => m.name.trim().toLowerCase() === normalized) ?? null;
 }
 
-export default function VaccineImportModal({ visible, existingVaccines, onClose, onImport }) {
-  const [documentUri, setDocumentUri] = useState(null);
+export default function MedicineImportModal({ visible, existingMedicines, onClose, onImport }) {
   const [documentName, setDocumentName] = useState(null);
   const [extracting, setExtracting] = useState(false);
   const [found, setFound] = useState(null); // null = not extracted yet
@@ -52,7 +48,6 @@ export default function VaccineImportModal({ visible, existingVaccines, onClose,
 
   useEffect(() => {
     if (visible) {
-      setDocumentUri(null);
       setDocumentName(null);
       setExtracting(false);
       setFound(null);
@@ -68,7 +63,6 @@ export default function VaccineImportModal({ visible, existingVaccines, onClose,
     });
     if (result.canceled) return;
     const file = result.assets[0];
-    setDocumentUri(file.uri);
     setDocumentName(file.name);
     await runExtraction(file.uri, "application/pdf");
   }
@@ -78,7 +72,7 @@ export default function VaccineImportModal({ visible, existingVaccines, onClose,
     if (!permission.granted) {
       Alert.alert(
         "Camera access needed",
-        "Mollycoddle needs camera permission to photograph a vaccination record."
+        "Mollycoddle needs camera permission to photograph a medicine label."
       );
       return;
     }
@@ -86,7 +80,6 @@ export default function VaccineImportModal({ visible, existingVaccines, onClose,
     if (result.canceled) return;
     const photo = result.assets[0];
     const mediaType = photo.mimeType || "image/jpeg";
-    setDocumentUri(photo.uri);
     setDocumentName(`Photo — ${new Date().toLocaleDateString()}`);
     await runExtraction(photo.uri, mediaType);
   }
@@ -95,16 +88,19 @@ export default function VaccineImportModal({ visible, existingVaccines, onClose,
     setExtracting(true);
     setFound(null);
     try {
-      const vaccines = await extractFromFile(uri, mediaType, "vaccines");
-      const parsed = vaccines.map((v) => {
-        const name = v.name || "Unnamed vaccine";
-        const match = findExistingMatch(name, existingVaccines);
+      const medicines = await extractFromFile(uri, mediaType, "medicines");
+      const parsed = medicines.map((m) => {
+        const name = m.name || "Unnamed medicine";
+        const match = findExistingMatch(name, existingMedicines);
         return {
           name,
-          dateGiven: parseLocalDate(v.dateGiven),
-          nextDueDate: parseLocalDate(v.nextDueDate),
-          matchedVaccineId: match?.id ?? null,
-          matchedVaccineName: match?.name ?? null,
+          dosage: m.dosage || "",
+          frequencyType: m.frequencyType === "interval" ? "interval" : "daily",
+          intervalDays: m.frequencyType === "interval" ? m.intervalDays || 1 : null,
+          expirationDate: parseLocalDate(m.expirationDate),
+          notes: m.notes || "",
+          matchedMedicineId: match?.id ?? null,
+          matchedMedicineName: match?.name ?? null,
         };
       });
       setFound(parsed);
@@ -132,17 +128,18 @@ export default function VaccineImportModal({ visible, existingVaccines, onClose,
       .filter((_, i) => selected[i])
       .map((item, i) => ({
         name: item.name,
-        dateGiven: item.dateGiven,
-        nextDueDate: item.nextDueDate,
-        // Only treat it as an update if it matched AND the row is still in
-        // update mode — flipping the toggle makes it a plain new record.
-        matchedVaccineId: item.matchedVaccineId && updateMode[i] ? item.matchedVaccineId : null,
+        dosage: item.dosage,
+        frequencyType: item.frequencyType,
+        intervalDays: item.intervalDays,
+        expirationDate: item.expirationDate,
+        notes: item.notes,
+        matchedMedicineId: item.matchedMedicineId && updateMode[i] ? item.matchedMedicineId : null,
       }));
     if (chosen.length === 0) {
-      Alert.alert("Nothing selected", "Check at least one vaccine to import.");
+      Alert.alert("Nothing selected", "Check at least one medicine to import.");
       return;
     }
-    onImport(chosen, documentUri, documentName);
+    onImport(chosen);
   }
 
   const selectedCount = found ? found.filter((_, i) => selected[i]).length : 0;
@@ -151,13 +148,13 @@ export default function VaccineImportModal({ visible, existingVaccines, onClose,
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <ScrollView contentContainerStyle={styles.sheet}>
-          <Text style={styles.title}>Import vaccinations</Text>
+          <Text style={styles.title}>Import medicines</Text>
 
           {!documentName && (
             <>
               <Text style={styles.helpText}>
-                Take a photo of a vaccination sheet, or attach a PDF — Claude will pull out every
-                vaccine it can find, for you to review before adding.
+                Take a photo of a prescription label or medicine list, or attach a PDF — Claude
+                will pull out every medicine it can find, for you to review before adding.
               </Text>
               <Pressable style={styles.attachButton} onPress={handleTakePhoto}>
                 <Text style={styles.attachButtonText}>📷 Take a photo</Text>
@@ -188,34 +185,44 @@ export default function VaccineImportModal({ visible, existingVaccines, onClose,
 
           {found && found.length === 0 && (
             <Text style={styles.helpText}>
-              No vaccines found. Try a clearer photo or a different file, or add one manually.
+              No medicines found. Try a clearer photo or a different file, or add one manually.
             </Text>
           )}
 
           {found && found.length > 0 && (
             <>
               <Text style={styles.label}>
-                Found {found.length} vaccine{found.length === 1 ? "" : "s"} — uncheck any you
+                Found {found.length} medicine{found.length === 1 ? "" : "s"} — uncheck any you
                 don't want
               </Text>
               {found.map((item, index) => (
-                <View key={index} style={styles.vaccineRow}>
-                  <Pressable style={styles.vaccineRowMain} onPress={() => toggleSelected(index)}>
+                <View key={index} style={styles.medicineRow}>
+                  <Pressable style={styles.medicineRowMain} onPress={() => toggleSelected(index)}>
                     <View style={[styles.checkbox, selected[index] && styles.checkboxChecked]}>
                       {selected[index] && <Text style={styles.checkmark}>✓</Text>}
                     </View>
-                    <View style={styles.vaccineInfo}>
-                      <Text style={styles.vaccineName}>{item.name}</Text>
-                      <Text style={styles.vaccineDates}>
-                        Given: {formatDate(item.dateGiven)} · Due: {formatDate(item.nextDueDate)}
+                    <View style={styles.medicineInfo}>
+                      <Text style={styles.medicineName}>{item.name}</Text>
+                      <Text style={styles.medicineDetail}>
+                        {[item.dosage, describeFrequency(item)].filter(Boolean).join(" · ")}
                       </Text>
+                      {item.expirationDate !== null && (
+                        <Text style={styles.medicineDetail}>
+                          Expires: {formatDate(item.expirationDate)}
+                        </Text>
+                      )}
+                      {!!item.notes && (
+                        <Text style={styles.medicineNotes} numberOfLines={2}>
+                          {item.notes}
+                        </Text>
+                      )}
                     </View>
                   </Pressable>
-                  {item.matchedVaccineId && (
+                  {item.matchedMedicineId && (
                     <Pressable onPress={() => toggleUpdateMode(index)} style={styles.matchNote}>
                       <Text style={styles.matchNoteText}>
                         {updateMode[index]
-                          ? `↻ Updates existing "${item.matchedVaccineName}" — tap to add as new instead`
+                          ? `↻ Updates existing "${item.matchedMedicineName}" — tap to add as new instead`
                           : "+ Will add as a new record — tap to update the existing one instead"}
                       </Text>
                     </Pressable>
@@ -320,12 +327,12 @@ const styles = StyleSheet.create({
     color: COLORS.moss,
     marginBottom: 10,
   },
-  vaccineRow: {
+  medicineRow: {
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  vaccineRowMain: {
+  medicineRowMain: {
     flexDirection: "row",
     alignItems: "center",
   },
@@ -348,18 +355,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
-  vaccineInfo: {
+  medicineInfo: {
     flex: 1,
   },
-  vaccineName: {
+  medicineName: {
     fontSize: 15,
     fontWeight: "600",
     color: COLORS.ink,
   },
-  vaccineDates: {
+  medicineDetail: {
     fontSize: 13,
     color: COLORS.inkSoft,
     marginTop: 2,
+  },
+  medicineNotes: {
+    fontSize: 12,
+    color: COLORS.inkSoft,
+    marginTop: 2,
+    fontStyle: "italic",
   },
   matchNote: {
     marginTop: 6,

@@ -8,11 +8,14 @@ import { Pressable, View, Text, StyleSheet } from "react-native";
 import { COLORS } from "../theme";
 import { describeFrequency } from "../lib/medicineStorage";
 import { describeNextDose } from "../lib/schedule";
+import { describeExpiration, isExpired } from "../lib/medicineExpiry";
 
 export default function MedicineRow({ medicine, givenToday, onPress, onToggleGiven }) {
   const dueText = describeNextDose(medicine);
   const dueToday = dueText === "Due today";
   const statusText = dueToday && givenToday ? "Given today" : dueText;
+  const expirationText = describeExpiration(medicine);
+  const expired = isExpired(medicine);
 
   return (
     <View style={styles.row}>
@@ -24,6 +27,11 @@ export default function MedicineRow({ medicine, givenToday, onPress, onToggleGiv
           {[medicine.dosage, describeFrequency(medicine)].filter(Boolean).join(" · ")}
         </Text>
         <Text style={[styles.dueBadge, dueToday && styles.dueBadgeToday]}>{statusText}</Text>
+        {expirationText && (
+          <Text style={[styles.expiration, expired && styles.expirationExpired]}>
+            {expirationText}
+          </Text>
+        )}
       </Pressable>
       <Pressable
         style={[styles.checkCircle, givenToday && styles.checkCircleFilled]}
@@ -67,6 +75,15 @@ const styles = StyleSheet.create({
   },
   dueBadgeToday: {
     color: COLORS.moss,
+  },
+  expiration: {
+    fontSize: 12,
+    color: COLORS.inkSoft,
+    marginTop: 1,
+  },
+  expirationExpired: {
+    color: COLORS.danger,
+    fontWeight: "600",
   },
   checkCircle: {
     width: 28,

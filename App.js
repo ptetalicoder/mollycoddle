@@ -37,6 +37,7 @@ import PetAvatar from "./components/PetAvatar";
 import PetFormModal from "./components/PetFormModal";
 import PetDetailModal from "./components/PetDetailModal";
 import MedicineFormModal from "./components/MedicineFormModal";
+import MedicineImportModal from "./components/MedicineImportModal";
 import VaccineFormModal from "./components/VaccineFormModal";
 import VaccineImportModal from "./components/VaccineImportModal";
 import DoseHistoryModal from "./components/DoseHistoryModal";
@@ -72,6 +73,7 @@ function AppContent() {
   // context and immediately see the updated medicine list after saving.
   const [medicineFormVisible, setMedicineFormVisible] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState(null);
+  const [medicineImportVisible, setMedicineImportVisible] = useState(false);
 
   // useEffect with an empty [] dependency array runs once, right after the
   // very first render — the standard React way to say "load my data now."
@@ -258,6 +260,58 @@ function AppContent() {
     await saveDoseLogs(next);
   }
 
+  // Adds (or updates) several medicines at once from a reviewed
+  // extraction batch. An item carrying `matchedMedicineId` — the common
+  // case when you photograph a renewed prescription with a changed dose —
+  // updates that record instead of creating a duplicate.
+  async function handleImportMedicines(selectedItems) {
+    const granted = await requestNotificationPermission();
+    let nextMedicines = [...medicines];
+
+    for (const item of selectedItems) {
+      const existing = item.matchedMedicineId
+        ? nextMedicines.find((m) => m.id === item.matchedMedicineId)
+        : null;
+
+      const base = {
+        id: existing?.id ?? makeId(),
+        petId: selectedPet.id,
+        name: item.name,
+        dosage: item.dosage || existing?.dosage || "",
+        frequencyType: item.frequencyType,
+        weeklyDays: existing?.weeklyDays ?? [],
+        intervalDays: item.intervalDays,
+        reminderTime: existing?.reminderTime ?? "morning",
+        expirationDate: item.expirationDate ?? existing?.expirationDate ?? null,
+        notes: item.notes || existing?.notes || "",
+        createdAt: existing?.createdAt ?? Date.now(),
+        notificationIds: [],
+      };
+
+      if (existing?.notificationIds?.length) {
+        await cancelForMedicine(existing);
+      }
+      let notificationIds = [];
+      if (granted) {
+        try {
+          notificationIds = await rescheduleForMedicine(base, WEEK_DAYS);
+        } catch {
+          // One reminder failing to schedule shouldn't block the rest of
+          // the import — the medicine record itself is still worth keeping.
+        }
+      }
+      const saved = { ...base, notificationIds };
+
+      nextMedicines = existing
+        ? nextMedicines.map((m) => (m.id === saved.id ? saved : m))
+        : [...nextMedicines, saved];
+    }
+
+    setMedicines(nextMedicines);
+    setMedicineImportVisible(false);
+    await saveMedicines(nextMedicines);
+  }
+
   function openAddVaccineForm() {
     setEditingVaccine(null);
     setVaccineFormVisible(true);
@@ -423,7 +477,13 @@ function AppContent() {
         medicines={petMedicines}
         vaccines={petVaccines}
         givenTodayIds={givenTodayIds}
-        hidden={medicineFormVisible || historyVisible || vaccineFormVisible || importVisible}
+        hidden={
+          medicineFormVisible ||
+          historyVisible ||
+          vaccineFormVisible ||
+          importVisible ||
+          medicineImportVisible
+        }
         onClose={() => setSelectedPet(null)}
         onEdit={openEditForm}
         onDelete={handleDeletePet}
@@ -431,6 +491,7 @@ function AppContent() {
         onEditMedicine={openEditMedicineForm}
         onToggleGiven={handleToggleGiven}
         onViewHistory={() => setHistoryVisible(true)}
+        onImportMedicines={() => setMedicineImportVisible(true)}
         onAddVaccine={openAddVaccineForm}
         onEditVaccine={openEditVaccineForm}
         onImportVaccines={() => setImportVisible(true)}
@@ -442,6 +503,13 @@ function AppContent() {
         onClose={() => setMedicineFormVisible(false)}
         onSave={handleSaveMedicine}
         onDelete={handleDeleteMedicine}
+      />
+
+      <MedicineImportModal
+        visible={medicineImportVisible}
+        existingMedicines={petMedicines}
+        onClose={() => setMedicineImportVisible(false)}
+        onImport={handleImportMedicines}
       />
 
       <VaccineFormModal

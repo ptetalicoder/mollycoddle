@@ -23,6 +23,7 @@ export default function PetDetailModal({
   onEditMedicine,
   onToggleGiven,
   onViewHistory,
+  onImportMedicines,
   onAddVaccine,
   onEditVaccine,
   onImportVaccines,
@@ -80,6 +81,9 @@ export default function PetDetailModal({
                 <Text style={styles.linkButtonText}>View dose history</Text>
               </Pressable>
             )}
+            <Pressable onPress={onImportMedicines} style={styles.linkButton}>
+              <Text style={styles.linkButtonText}>Import from photo/PDF</Text>
+            </Pressable>
           </View>
 
           <View style={styles.section}>
@@ -105,7 +109,7 @@ export default function PetDetailModal({
             )}
 
             <Pressable onPress={onImportVaccines} style={styles.linkButton}>
-              <Text style={styles.linkButtonText}>Import from PDF</Text>
+              <Text style={styles.linkButtonText}>Import from photo/PDF</Text>
             </Pressable>
           </View>
 

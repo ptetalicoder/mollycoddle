@@ -20,9 +20,11 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { COLORS } from "../theme";
 import { WEEK_DAYS } from "../lib/weekDays";
 import { REMINDER_TIMES, requestNotificationPermission, sendTestNotification } from "../lib/notifications";
+import { formatDate } from "../lib/vaccineSchedule";
 
 const FREQUENCY_OPTIONS = [
   { key: "daily", label: "Daily" },
@@ -39,6 +41,8 @@ export default function MedicineFormModal({ visible, medicine, onClose, onSave, 
   const [weeklyDays, setWeeklyDays] = useState([]);
   const [intervalDays, setIntervalDays] = useState("");
   const [reminderTime, setReminderTime] = useState("morning");
+  const [expirationDate, setExpirationDate] = useState(null);
+  const [showExpirationPicker, setShowExpirationPicker] = useState(false);
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
@@ -49,9 +53,19 @@ export default function MedicineFormModal({ visible, medicine, onClose, onSave, 
       setWeeklyDays(medicine?.weeklyDays ?? []);
       setIntervalDays(medicine?.intervalDays ? String(medicine.intervalDays) : "");
       setReminderTime(medicine?.reminderTime ?? "morning");
+      setExpirationDate(medicine?.expirationDate ?? null);
+      setShowExpirationPicker(false);
       setNotes(medicine?.notes ?? "");
     }
   }, [visible, medicine]);
+
+  function handleExpirationPicked(event, selectedDate) {
+    // Android's picker is a transient dialog that closes itself on its
+    // own; iOS's inline picker stays open until "Done" is tapped below.
+    if (Platform.OS === "android") setShowExpirationPicker(false);
+    if (event.type === "dismissed" || !selectedDate) return;
+    setExpirationDate(selectedDate.getTime());
+  }
 
   function toggleWeeklyDay(day) {
     setWeeklyDays((current) =>
@@ -82,6 +96,7 @@ export default function MedicineFormModal({ visible, medicine, onClose, onSave, 
       weeklyDays: frequencyType === "weekly" ? weeklyDays : [],
       intervalDays: frequencyType === "interval" ? parsedInterval : null,
       reminderTime,
+      expirationDate,
       notes: notes.trim(),
     });
   }
@@ -133,6 +148,33 @@ export default function MedicineFormModal({ visible, medicine, onClose, onSave, 
             placeholder="e.g. 1 tablet, 5mg"
             placeholderTextColor={COLORS.inkSoft}
           />
+
+          <Text style={styles.label}>Expiration date (optional)</Text>
+          <Pressable style={styles.dateInput} onPress={() => setShowExpirationPicker(true)}>
+            <Text style={styles.dateInputText}>
+              {expirationDate ? formatDate(expirationDate) : "Not set"}
+            </Text>
+          </Pressable>
+          {expirationDate && (
+            <Pressable onPress={() => setExpirationDate(null)} style={styles.quickLink}>
+              <Text style={styles.quickLinkText}>Clear expiration date</Text>
+            </Pressable>
+          )}
+          {showExpirationPicker && (
+            <View style={styles.pickerWrap}>
+              <DateTimePicker
+                value={new Date(expirationDate ?? Date.now())}
+                mode="date"
+                display={Platform.OS === "ios" ? "inline" : "default"}
+                onChange={handleExpirationPicked}
+              />
+              {Platform.OS === "ios" && (
+                <Pressable onPress={() => setShowExpirationPicker(false)} style={styles.doneButton}>
+                  <Text style={styles.doneButtonText}>Done</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
 
           <Text style={styles.label}>Frequency</Text>
           <View style={styles.chipRow}>
@@ -274,6 +316,38 @@ const styles = StyleSheet.create({
   notesInput: {
     minHeight: 70,
     textAlignVertical: "top",
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 6,
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: COLORS.ink,
+  },
+  quickLink: {
+    marginBottom: 16,
+  },
+  quickLinkText: {
+    color: COLORS.moss,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  pickerWrap: {
+    marginBottom: 16,
+  },
+  doneButton: {
+    alignSelf: "flex-end",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  doneButtonText: {
+    color: COLORS.moss,
+    fontWeight: "700",
   },
   chipRow: {
     flexDirection: "row",
