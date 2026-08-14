@@ -19,7 +19,10 @@
       "adaptiveIcon": {
         "backgroundColor": "#F1F4EE"
       },
-      "package": "com.mollycoddle.app"
+      "package": "com.mollycoddle.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {},
     "plugins": [
@@ -31,6 +34,18 @@
         }
       ],
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4c626b49-6f43-4bd5-a366-ee0a1099dd25"
+      }
+    },
+    "owner": "mollycoddle",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4c626b49-6f43-4bd5-a366-ee0a1099dd25"
+    }
   }
 }
