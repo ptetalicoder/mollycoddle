@@ -21,6 +21,7 @@
       },
       "package": "com.mollycoddle.app",
       "permissions": [
+        "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -35,17 +36,17 @@
       ],
       "@react-native-community/datetimepicker"
     ],
-    "extra": {
-      "eas": {
-        "projectId": "4c626b49-6f43-4bd5-a366-ee0a1099dd25"
-      }
-    },
-    "owner": "mollycoddle",
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "extra": {
+      "eas": {
+        "projectId": "f5df14f7-5a07-4baa-b483-204e25ab3e94"
+      }
+    },
+    "owner": "ptetali",
     "updates": {
-      "url": "https://u.expo.dev/4c626b49-6f43-4bd5-a366-ee0a1099dd25"
+      "url": "https://u.expo.dev/f5df14f7-5a07-4baa-b483-204e25ab3e94"
     }
   }
 }
