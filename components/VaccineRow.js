@@ -6,7 +6,7 @@
 import React from "react";
 import { Pressable, Text, StyleSheet } from "react-native";
 import { COLORS } from "../theme";
-import { describeVaccineStatus, isOverdue } from "../lib/vaccineSchedule";
+import { describeVaccineStatus, isOverdue, formatDate } from "../lib/vaccineSchedule";
 
 export default function VaccineRow({ vaccine, onPress }) {
   const statusText = describeVaccineStatus(vaccine);
@@ -21,6 +21,7 @@ export default function VaccineRow({ vaccine, onPress }) {
         {vaccine.documentName ? `Record attached` : "No record attached"}
       </Text>
       <Text style={[styles.status, overdue && styles.statusOverdue]}>{statusText}</Text>
+      {overdue && <Text style={styles.overdueDate}>{formatDate(vaccine.nextDueDate)}</Text>}
     </Pressable>
   );
 }
@@ -49,5 +50,10 @@ const styles = StyleSheet.create({
   },
   statusOverdue: {
     color: COLORS.danger,
+  },
+  overdueDate: {
+    fontSize: 12,
+    color: COLORS.danger,
+    marginTop: 1,
   },
 });

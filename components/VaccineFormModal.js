@@ -9,9 +9,10 @@
 // @react-native-community/datetimepicker.
 //
 // A PDF record can be attached for reference (via expo-document-picker).
-// Auto-filling the fields *from* that PDF is a separate, later step (see
-// docs/SDLC.md) — for now this just stores the file alongside the record
-// you fill in yourself.
+// Bulk-extracting several vaccines from a PDF at once is a separate flow
+// — see VaccineImportModal.js — since reviewing a list is a better fit for
+// "here are 4 vaccines, which do you want" than repeating this one-at-a-
+// time form.
 
 import React, { useEffect, useState } from "react";
 import {
@@ -30,16 +31,9 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import * as DocumentPicker from "expo-document-picker";
 import { COLORS } from "../theme";
 import { REMINDER_TIMES } from "../lib/notifications";
+import { formatDate } from "../lib/vaccineSchedule";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
-
-function formatDate(timestamp) {
-  return new Date(timestamp).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 export default function VaccineFormModal({ visible, vaccine, onClose, onSave, onDelete }) {
   const isEditing = !!vaccine;

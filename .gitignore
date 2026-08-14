@@ -10,3 +10,6 @@ npm-debug.*
 *.orig.*
 web-build/
 .DS_Store
+
+# Holds the real APP_SHARED_SECRET — never commit this. See lib/config.example.js.
+lib/config.js

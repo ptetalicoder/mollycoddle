@@ -38,6 +38,7 @@ import PetFormModal from "./components/PetFormModal";
 import PetDetailModal from "./components/PetDetailModal";
 import MedicineFormModal from "./components/MedicineFormModal";
 import VaccineFormModal from "./components/VaccineFormModal";
+import VaccineImportModal from "./components/VaccineImportModal";
 import DoseHistoryModal from "./components/DoseHistoryModal";
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -57,6 +58,7 @@ function AppContent() {
   // detail sheet rather than replacing it.
   const [vaccineFormVisible, setVaccineFormVisible] = useState(false);
   const [editingVaccine, setEditingVaccine] = useState(null);
+  const [importVisible, setImportVisible] = useState(false);
 
   // The form modal is shared between "add" and "edit". When `formPet` is a
   // pet object, the form opens pre-filled to edit that pet. When it's
@@ -304,6 +306,49 @@ function AppContent() {
     await saveVaccines(next);
   }
 
+  // Adds several vaccines at once from a reviewed PDF-extraction batch.
+  // Any Claude didn't find a date for defaults to today / one year out,
+  // same defaults as the manual form, so every record still has a usable
+  // schedule.
+  async function handleImportVaccines(selectedItems, documentUri, documentName) {
+    const granted = await requestNotificationPermission();
+    const newVaccines = [];
+
+    for (const item of selectedItems) {
+      const dateGiven = item.dateGiven ?? Date.now();
+      const nextDueDate = item.nextDueDate ?? dateGiven + 365 * 24 * 60 * 60 * 1000;
+      const base = {
+        id: makeId(),
+        petId: selectedPet.id,
+        name: item.name,
+        dateGiven,
+        nextDueDate,
+        reminderTime: "morning",
+        notes: "",
+        documentUri,
+        documentName,
+        createdAt: Date.now(),
+        notificationId: null,
+      };
+
+      let notificationId = null;
+      if (granted) {
+        try {
+          notificationId = await rescheduleForVaccine(base);
+        } catch {
+          // One reminder failing to schedule shouldn't block the rest of
+          // the import — the vaccine record itself is still worth keeping.
+        }
+      }
+      newVaccines.push({ ...base, notificationId });
+    }
+
+    const next = [...vaccines, ...newVaccines];
+    setVaccines(next);
+    setImportVisible(false);
+    await saveVaccines(next);
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
@@ -364,7 +409,7 @@ function AppContent() {
         medicines={petMedicines}
         vaccines={petVaccines}
         givenTodayIds={givenTodayIds}
-        hidden={medicineFormVisible || historyVisible || vaccineFormVisible}
+        hidden={medicineFormVisible || historyVisible || vaccineFormVisible || importVisible}
         onClose={() => setSelectedPet(null)}
         onEdit={openEditForm}
         onDelete={handleDeletePet}
@@ -374,6 +419,7 @@ function AppContent() {
         onViewHistory={() => setHistoryVisible(true)}
         onAddVaccine={openAddVaccineForm}
         onEditVaccine={openEditVaccineForm}
+        onImportVaccines={() => setImportVisible(true)}
       />
 
       <MedicineFormModal
@@ -390,6 +436,12 @@ function AppContent() {
         onClose={() => setVaccineFormVisible(false)}
         onSave={handleSaveVaccine}
         onDelete={handleDeleteVaccine}
+      />
+
+      <VaccineImportModal
+        visible={importVisible}
+        onClose={() => setImportVisible(false)}
+        onImport={handleImportVaccines}
       />
 
       <DoseHistoryModal

@@ -25,6 +25,7 @@ export default function PetDetailModal({
   onViewHistory,
   onAddVaccine,
   onEditVaccine,
+  onImportVaccines,
 }) {
   if (!pet) return null;
 
@@ -75,8 +76,8 @@ export default function PetDetailModal({
             )}
 
             {medicines.length > 0 && (
-              <Pressable onPress={onViewHistory} style={styles.historyLink}>
-                <Text style={styles.historyLinkText}>View dose history</Text>
+              <Pressable onPress={onViewHistory} style={styles.linkButton}>
+                <Text style={styles.linkButtonText}>View dose history</Text>
               </Pressable>
             )}
           </View>
@@ -102,6 +103,10 @@ export default function PetDetailModal({
                 />
               ))
             )}
+
+            <Pressable onPress={onImportVaccines} style={styles.linkButton}>
+              <Text style={styles.linkButtonText}>Import from PDF</Text>
+            </Pressable>
           </View>
 
           <Pressable style={styles.editButton} onPress={() => onEdit(pet)}>
@@ -175,11 +180,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingVertical: 10,
   },
-  historyLink: {
+  linkButton: {
     marginTop: 8,
     alignItems: "center",
   },
-  historyLinkText: {
+  linkButtonText: {
     color: COLORS.moss,
     fontSize: 13,
     fontWeight: "600",
