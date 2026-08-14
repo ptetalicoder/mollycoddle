@@ -26,7 +26,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Mollycoddle uses your photos to let you pick a picture of your pet."
+          "photosPermission": "Mollycoddle uses your photos to let you pick a picture of your pet.",
+          "cameraPermission": "Mollycoddle uses your camera to let you photograph a vaccination record."
         }
       ],
       "@react-native-community/datetimepicker"

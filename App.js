@@ -306,31 +306,42 @@ function AppContent() {
     await saveVaccines(next);
   }
 
-  // Adds several vaccines at once from a reviewed PDF-extraction batch.
-  // Any Claude didn't find a date for defaults to today / one year out,
-  // same defaults as the manual form, so every record still has a usable
-  // schedule.
+  // Adds (or updates) several vaccines at once from a reviewed
+  // extraction batch. An item carrying `matchedVaccineId` — the common
+  // case when you photograph an updated card for a vaccine already on
+  // file — updates that record's dates instead of creating a duplicate.
+  // Any date Claude didn't find defaults to today / one year out, same as
+  // the manual form, so every record still has a usable schedule.
   async function handleImportVaccines(selectedItems, documentUri, documentName) {
     const granted = await requestNotificationPermission();
-    const newVaccines = [];
+    let nextVaccines = [...vaccines];
 
     for (const item of selectedItems) {
       const dateGiven = item.dateGiven ?? Date.now();
       const nextDueDate = item.nextDueDate ?? dateGiven + 365 * 24 * 60 * 60 * 1000;
-      const base = {
-        id: makeId(),
-        petId: selectedPet.id,
-        name: item.name,
-        dateGiven,
-        nextDueDate,
-        reminderTime: "morning",
-        notes: "",
-        documentUri,
-        documentName,
-        createdAt: Date.now(),
-        notificationId: null,
-      };
+      const existing = item.matchedVaccineId
+        ? nextVaccines.find((v) => v.id === item.matchedVaccineId)
+        : null;
 
+      const base = existing
+        ? { ...existing, dateGiven, nextDueDate, documentUri, documentName }
+        : {
+            id: makeId(),
+            petId: selectedPet.id,
+            name: item.name,
+            dateGiven,
+            nextDueDate,
+            reminderTime: "morning",
+            notes: "",
+            documentUri,
+            documentName,
+            createdAt: Date.now(),
+            notificationId: null,
+          };
+
+      if (existing?.notificationId) {
+        await cancelForVaccine(existing);
+      }
       let notificationId = null;
       if (granted) {
         try {
@@ -340,13 +351,16 @@ function AppContent() {
           // the import — the vaccine record itself is still worth keeping.
         }
       }
-      newVaccines.push({ ...base, notificationId });
+      const saved = { ...base, notificationId };
+
+      nextVaccines = existing
+        ? nextVaccines.map((v) => (v.id === saved.id ? saved : v))
+        : [...nextVaccines, saved];
     }
 
-    const next = [...vaccines, ...newVaccines];
-    setVaccines(next);
+    setVaccines(nextVaccines);
     setImportVisible(false);
-    await saveVaccines(next);
+    await saveVaccines(nextVaccines);
   }
 
   return (
@@ -440,6 +454,7 @@ function AppContent() {
 
       <VaccineImportModal
         visible={importVisible}
+        existingVaccines={petVaccines}
         onClose={() => setImportVisible(false)}
         onImport={handleImportVaccines}
       />
